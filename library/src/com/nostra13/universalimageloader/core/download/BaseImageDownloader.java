@@ -71,9 +71,7 @@ public class BaseImageDownloader implements ImageDownloader {
 	protected final int readTimeout;
 
 	public BaseImageDownloader(Context context) {
-		this.context = context.getApplicationContext();
-		this.connectTimeout = DEFAULT_HTTP_CONNECT_TIMEOUT;
-		this.readTimeout = DEFAULT_HTTP_READ_TIMEOUT;
+		this(context, DEFAULT_HTTP_CONNECT_TIMEOUT, DEFAULT_HTTP_READ_TIMEOUT);
 	}
 
 	public BaseImageDownloader(Context context, int connectTimeout, int readTimeout) {
@@ -129,7 +127,22 @@ public class BaseImageDownloader implements ImageDownloader {
 			IoUtils.readAndCloseStream(conn.getErrorStream());
 			throw e;
 		}
+		if (!shouldBeProcessed(conn)) {
+			IoUtils.closeSilently(imageStream);
+			throw new IOException("Image request failed with response code " + conn.getResponseCode());
+		}
+
 		return new ContentLengthInputStream(new BufferedInputStream(imageStream, BUFFER_SIZE), conn.getContentLength());
+	}
+
+	/**
+	 * @param conn Opened request connection (response code is available)
+	 * @return <b>true</b> - if data from connection is correct and should be read and processed;
+	 *         <b>false</b> - if response contains irrelevant data and shouldn't be processed
+	 * @throws IOException
+	 */
+	protected boolean shouldBeProcessed(HttpURLConnection conn) throws IOException {
+		return conn.getResponseCode() == 200;
 	}
 
 	/**
